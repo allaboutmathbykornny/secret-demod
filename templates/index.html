@@ -1,3 +1,4 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html>
   <head>
@@ -30,9 +31,6 @@
         padding: 0.5em 1.2em;
         cursor: pointer;
       }
-      .mode-group {
-        margin-top: 1em;
-      }
     </style>
   </head>
   <body>
@@ -51,18 +49,6 @@
         Seed (integer):
         <input type="text" name="seed" placeholder="e.g. 131005" required>
       </label>
-
-      <div class="mode-group">
-        <label>Mode:</label>
-        <label>
-          <input type="radio" name="mode" value="scramble" checked>
-          Scramble
-        </label>
-        <label>
-          <input type="radio" name="mode" value="unscramble">
-          Unscramble
-        </label>
-      </div>
 
       <button type="submit">Process</button>
     </form>

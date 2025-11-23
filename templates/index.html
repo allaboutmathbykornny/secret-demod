@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Secret Demod</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 600px;
+        margin: 40px auto;
+      }
+      h1 {
+        margin-bottom: 0.2em;
+      }
+      .hint {
+        font-size: 0.9em;
+        color: #555;
+        margin-bottom: 1.5em;
+      }
+      label {
+        display: block;
+        margin-top: 1em;
+      }
+      input[type="file"],
+      input[type="text"] {
+        margin-top: 0.3em;
+      }
+      button {
+        margin-top: 1.5em;
+        padding: 0.5em 1.2em;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Secret Message</h1>
+    <p class="hint">
+      Mystery hidden behind yours, demodulate at your natural frequency
+      and you’ll find what’s buried in the noise.
+    </p>
+
+    <form method="post" enctype="multipart/form-data">
+      <label>
+        Audio file:
+        <input type="file" name="audiofile" accept=".wav" required>
+      </label>
+
+      <label>
+        Your natural frequency:
+        <input type="text" name="freq" placeholder="enter your frequency" required>
+      </label>
+
+      <button type="submit">Demodulate</button>
+    </form>
+  </body>
+</html>

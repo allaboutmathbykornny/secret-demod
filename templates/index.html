@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Secret Permutation Scrambler</title>
+    <title>Secret Full-Sample Scrambler</title>
     <style>
       body {
         font-family: sans-serif;
@@ -36,10 +36,11 @@
     </style>
   </head>
   <body>
-    <h1>Secret Permutation Scrambler</h1>
+    <h1>Secret Full-Sample Scrambler</h1>
     <p class="hint">
-      This scrambles your audio by <strong>reordering time blocks</strong> using a secret seed.
+      This permutes <strong>every sample</strong> in your audio using a seed.
       Use the <strong>same seed</strong> and choose "Unscramble" to restore it.
+      (Try seed <strong>131005</strong> 😉)
     </p>
 
     <form method="post" enctype="multipart/form-data">
@@ -50,7 +51,7 @@
 
       <label>
         Seed (integer):
-        <input type="text" name="seed" placeholder="e.g. 12345" required>
+        <input type="text" name="seed" placeholder="e.g. 131005" required>
       </label>
 
       <div class="mode-group">

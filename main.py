@@ -1,88 +1,127 @@
 """
-main.py
-
-Secret Demod – minimal Replit web app
+Secret Permutation Scrambler – Flask web app
 
 What it does:
 - Shows a web page where you can upload a WAV file.
-- Ask for a carrier frequency (in Hz).
-- Demodulates the file and sends back a new WAV you can download.
+- Asks for a seed (integer) and a mode: "scramble" or "unscramble".
+- Splits the audio into blocks and permutes those blocks using a
+  pseudo-random permutation determined by the seed.
 
-Notes:
-- This version uses scipy.io.wavfile instead of soundfile
-  to keep dependencies simple on Replit.
-- Input must be a WAV file.
+Important:
+- Use the SAME seed to unscramble that you used to scramble.
+- Scramble and Unscramble are perfect inverses (up to padding at the end).
 """
 
 import os
 import io
 import numpy as np
 from flask import Flask, render_template, request, send_file
-from scipy import signal
 from scipy.io import wavfile
 
 app = Flask(__name__)
 
-# ---------- Demodulation logic ----------
+# You can tweak this: number of samples per block.
+# At 44100 Hz, 44100 samples ≈ 1 second blocks, 4410 ≈ 0.1 s, etc.
+BLOCK_SIZE = 44100  # 1 second at 44.1 kHz
 
-def secret_demod_array(data, fs, carrier_freq_hz):
+
+# ---------- Core permutation logic ----------
+
+def permute_blocks(data, seed, mode="scramble", block_size=BLOCK_SIZE):
     """
-    Demodulate a 1D numpy array audio signal at the given carrier frequency.
-    Returns a float32 array in range [-1, 1].
+    Permute audio blocks using a deterministic permutation based on 'seed'.
+
+    - data: numpy array of shape (N,) for mono or (N, C) for multi-channel.
+    - seed: integer seed for RNG.
+    - mode: "scramble" or "unscramble".
+    - block_size: samples per block (same for scramble and unscramble).
+
+    Returns a new array with the same dtype and shape (up to padding).
     """
-    # Convert to float if data is int16 or similar
-    if np.issubdtype(data.dtype, np.integer):
-        max_int = np.iinfo(data.dtype).max
-        data = data.astype(np.float32) / max_int
+    # Ensure data is at least 1D
+    data = np.asarray(data)
+    original_length = data.shape[0]
+
+    # Pad so the length is a multiple of block_size
+    n_samples = original_length
+    n_blocks = int(np.ceil(n_samples / block_size))
+    padded_length = n_blocks * block_size
+    pad_len = padded_length - n_samples
+
+    if data.ndim == 1:
+        # Mono: shape (N,) -> pad to (padded_length,)
+        if pad_len > 0:
+            data_padded = np.pad(data, (0, pad_len), mode="constant", constant_values=0)
+        else:
+            data_padded = data
+        # Reshape to (n_blocks, block_size)
+        blocks = data_padded.reshape(n_blocks, block_size)
     else:
-        data = data.astype(np.float32)
+        # Multi-channel: shape (N, C)
+        n_channels = data.shape[1]
+        if pad_len > 0:
+            data_padded = np.pad(
+                data,
+                ((0, pad_len), (0, 0)),
+                mode="constant",
+                constant_values=0
+            )
+        else:
+            data_padded = data
+        # Reshape to (n_blocks, block_size, n_channels)
+        blocks = data_padded.reshape(n_blocks, block_size, n_channels)
 
-    # Mono
-    if data.ndim > 1:
-        data = data.mean(axis=1)
+    # Make a seed-based permutation of block indices
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(n_blocks)
 
-    nyquist = fs / 2.0
-    n = len(data)
-    t = np.arange(n) / fs
+    if mode == "scramble":
+        # Scramble: reorder blocks according to perm
+        permuted_blocks = blocks[perm]
+    elif mode == "unscramble":
+        # Unscramble: apply inverse permutation
+        inv_perm = np.empty_like(perm)
+        inv_perm[perm] = np.arange(n_blocks)
+        permuted_blocks = blocks[inv_perm]
+    else:
+        raise ValueError("mode must be 'scramble' or 'unscramble'")
 
-    # Mix down with cosine
-    carrier = np.cos(2.0 * np.pi * carrier_freq_hz * t)
-    mixed = 2.0 * data * carrier
+    # Reshape back to the padded shape
+    if data.ndim == 1:
+        result_padded = permuted_blocks.reshape(padded_length)
+    else:
+        result_padded = permuted_blocks.reshape(padded_length, -1)
 
-    # Low-pass filter
-    baseband_max = 15000.0
-    cutoff = min(baseband_max, nyquist * 0.9)
-    norm_cutoff = cutoff / nyquist
+    # Crop back to the original length
+    result = result_padded[:original_length]
 
-    b, a = signal.butter(6, norm_cutoff, btype="low")
-    demod = signal.filtfilt(b, a, mixed)
+    # Preserve original dtype
+    if np.issubdtype(data.dtype, np.integer):
+        # Make sure we don't overflow when casting back
+        info = np.iinfo(data.dtype)
+        result = np.clip(result, info.min, info.max).astype(data.dtype)
+    else:
+        result = result.astype(data.dtype)
 
-    # Normalize to [-1, 1]
-    max_abs = np.max(np.abs(demod))
-    if max_abs > 0:
-        demod = 0.99 * demod / max_abs
-
-    return demod.astype(np.float32)
+    return result
 
 
-def secret_demod_file(in_bytes, carrier_freq_hz):
+def process_file_with_seed_permutation(in_bytes, seed, mode):
     """
-    Take WAV bytes, demodulate, return new WAV bytes.
+    Take WAV bytes, apply permutation-based scrambling or unscrambling,
+    and return new WAV bytes.
     """
-    # Read from bytes
     in_buf = io.BytesIO(in_bytes)
     fs, data = wavfile.read(in_buf)
 
-    # Demodulate
-    demod = secret_demod_array(data, fs, carrier_freq_hz)
+    # Apply permutation
+    processed = permute_blocks(data, seed=seed, mode=mode)
 
-    # Convert back to int16 for WAV
-    out_int16 = (demod * 32767).astype(np.int16)
-
-    # Write to bytes
+    # Write to WAV in the same dtype as the processed array
     out_buf = io.BytesIO()
-    wavfile.write(out_buf, fs, out_int16)
+    wavfile.write(out_buf, fs, processed)
     out_buf.seek(0)
+
     return out_buf, fs
 
 
@@ -92,30 +131,35 @@ def secret_demod_file(in_bytes, carrier_freq_hz):
 def index():
     if request.method == "POST":
         f = request.files.get("audiofile")
-        freq_text = request.form.get("freq", "").strip()
+        seed_text = request.form.get("seed", "").strip()
+        mode = request.form.get("mode", "scramble").lower()
 
         if not f or f.filename == "":
             return "No file uploaded.", 400
 
-        if not freq_text:
-            return "No frequency provided.", 400
+        if not seed_text:
+            return "No seed provided.", 400
 
         try:
-            carrier_freq = float(freq_text)
+            seed = int(seed_text)
         except ValueError:
-            return "Frequency must be a number (in Hz).", 400
+            return "Seed must be an integer.", 400
+
+        if mode not in ("scramble", "unscramble"):
+            return "Invalid mode. Choose scramble or unscramble.", 400
 
         # Read uploaded file into memory
         in_bytes = f.read()
 
         try:
-            out_buf, fs = secret_demod_file(in_bytes, carrier_freq)
+            out_buf, fs = process_file_with_seed_permutation(in_bytes, seed, mode)
         except Exception as e:
-            return f"Error during demodulation: {e}", 500
+            return f"Error during processing: {e}", 500
 
-        # Name output file based on input name
+        # Name output file based on input name and mode
         base_name, _ = os.path.splitext(f.filename)
-        out_name = base_name + "_demod.wav"
+        suffix = "_scrambled" if mode == "scramble" else "_unscrambled"
+        out_name = base_name + suffix + ".wav"
 
         return send_file(
             out_buf,
@@ -128,6 +172,6 @@ def index():
 
 
 if __name__ == "__main__":
-    # Replit usually sets PORT in the environment
+    # Local testing; on Render you'll use gunicorn via Procfile
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=True)

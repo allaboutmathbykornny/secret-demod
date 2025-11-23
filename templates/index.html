@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Secret Demod</title>
+    <title>Secret Permutation Scrambler</title>
     <style>
       body {
         font-family: sans-serif;
@@ -30,27 +30,42 @@
         padding: 0.5em 1.2em;
         cursor: pointer;
       }
+      .mode-group {
+        margin-top: 1em;
+      }
     </style>
   </head>
   <body>
-    <h1>Secret Message</h1>
+    <h1>Secret Permutation Scrambler</h1>
     <p class="hint">
-      Mystery hidden behind yours, demodulate at your natural frequency
-      and you’ll find what’s buried in the noise.
+      This scrambles your audio by <strong>reordering time blocks</strong> using a secret seed.
+      Use the <strong>same seed</strong> and choose "Unscramble" to restore it.
     </p>
 
     <form method="post" enctype="multipart/form-data">
       <label>
-        Audio file:
+        Audio file (WAV):
         <input type="file" name="audiofile" accept=".wav" required>
       </label>
 
       <label>
-        Your natural frequency:
-        <input type="text" name="freq" placeholder="enter your frequency" required>
+        Seed (integer):
+        <input type="text" name="seed" placeholder="e.g. 12345" required>
       </label>
 
-      <button type="submit">Demodulate</button>
+      <div class="mode-group">
+        <label>Mode:</label>
+        <label>
+          <input type="radio" name="mode" value="scramble" checked>
+          Scramble
+        </label>
+        <label>
+          <input type="radio" name="mode" value="unscramble">
+          Unscramble
+        </label>
+      </div>
+
+      <button type="submit">Process</button>
     </form>
   </body>
 </html>
